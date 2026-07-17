@@ -1,0 +1,20 @@
+CREATE OR REPLACE TABLE `Customer_Data.int_customer_active_months` AS
+WITH RECURSIVE month_series AS (
+   
+SELECT
+customer_id,
+DATE_TRUNC(from_date, MONTH) AS activity_month,
+DATE_TRUNC(to_date, MONTH)   AS end_month
+FROM `Customer_Data.Activity`
+ 
+UNION ALL
+ 
+SELECT
+customer_id,
+DATE_ADD(activity_month, INTERVAL 1 MONTH),
+end_month
+FROM month_series
+WHERE activity_month < end_month
+)
+SELECT DISTINCT customer_id, activity_month
+FROM month_series;
