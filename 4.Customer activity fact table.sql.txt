@@ -1,0 +1,42 @@
+CREATE OR REPLACE TABLE `Customer_Data.fact_customer_monthly_activity` AS
+WITH RECURSIVE
+bounds AS (
+SELECT MAX(DATE_TRUNC(to_date, MONTH)) AS max_month
+FROM `Customer_Data.Activity`
+),
+customer_spine AS (
+SELECT
+d.customer_id,
+d.cohort_month,
+d.cohort_month AS activity_month,
+b.max_month
+FROM `Customer_Data.dim_customer` d
+CROSS JOIN bounds b
+WHERE d.cohort_month IS NOT NULL
+ 
+UNION ALL
+ 
+SELECT
+customer_id,
+cohort_month,
+DATE_ADD(activity_month, INTERVAL 1 MONTH),
+max_month
+FROM customer_spine
+WHERE activity_month < max_month
+)
+SELECT
+s.customer_id,
+s.activity_month,
+s.cohort_month,
+DATE_DIFF(s.activity_month, s.cohort_month, MONTH) AS months_since_acquisition,
+(CASE WHEN act.customer_id IS NOT NULL THEN 1 ELSE 0 END) AS is_active,
+COALESCE(sc.subscription_count, 0) AS subscription_count,
+d.customer_country,
+d.acquisition_taxonomy
+FROM customer_spine s
+JOIN `Customer_Data.dim_customer` d
+ON s.customer_id = d.customer_id
+LEFT JOIN `Customer_Data.int_customer_active_months` act
+ON s.customer_id = act.customer_id AND s.activity_month = act.activity_month
+LEFT JOIN `Customer_Data.int_customer_month_subscription_count` sc
+ON s.customer_id = sc.customer_id AND s.activity_month = sc.activity_month;
